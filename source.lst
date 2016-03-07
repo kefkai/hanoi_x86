@@ -1,0 +1,248 @@
+Microsoft (R) Macro Assembler Version 12.00.21005.1	    02/25/16 14:19:40
+/Hello World in Win32 ASM       (helloworld.asm		     Page 1 - 1
+
+
+				; This is a very simple 32 bit assembly program
+				; that uses the Win32 API to display hello world on the
+				; console.
+
+				TITLE Hello World in Win32 ASM       (helloworld.asm)
+
+				.386
+				.MODEL flat, stdcall
+				.STACK 4096
+
+				; ----------------------------------------------------------------------------
+				; These are prototypes for functions that we use
+				; from the Microsoft library Kernel32.lib.
+				; ----------------------------------------------------------------------------
+
+				; Win32 Console handle
+ =-0000000B			STD_OUTPUT_HANDLE EQU -11		        ; predefined Win API constant (magic)
+
+				GetStdHandle PROTO,                 ; get standard handle
+					nStdHandle:DWORD  		             ; type of console handle
+
+ = WriteConsoleA		WriteConsole EQU <WriteConsoleA>    ; alias
+
+				WriteConsole PROTO,		              ; write a buffer to the console
+					handle:DWORD,		                   ; output handle
+					lpBuffer:PTR BYTE,		             ; pointer to buffer
+					nNumberOfBytesToWrite:DWORD, 	     ; size of buffer
+					lpNumberOfBytesWritten:PTR DWORD,  ; num bytes written
+					lpReserved:DWORD		               ; (not used)
+
+				ExitProcess PROTO,                  ; exit program
+					dwExitCode:DWORD		               ; return code
+					
+				; ----------------------------------------------------------------------------
+
+
+
+
+				; ----------------------------------------------------------------------------
+				; global data
+				; ----------------------------------------------------------------------------
+
+ 00000000			.data
+ 00000000 00000000		consoleOutHandle dd ?     	      ; DWORD: handle to standard output device
+ 00000004 00000000		bytesWritten     dd ?     	      ; DWORD: number of bytes written
+ 00000008 53 74 61 72 74	message db "Starting Output, if number of disks is even Destination is Pole 1, Otherwise Destination is Pole 2",13,10,0  ; BYTE: string, with \r, \n, \0 at the end
+	   69 6E 67 20 4F
+	   75 74 70 75 74
+	   2C 20 69 66 20
+	   6E 75 6D 62 65
+	   72 20 6F 66 20
+	   64 69 73 6B 73
+	   20 69 73 20 65
+	   76 65 6E 20 44
+	   65 73 74 69 6E
+	   61 74 69 6F 6E
+	   20 69 73 20 50
+	   6F 6C 65 20 31
+	   2C 20 4F 74 68
+	   65 72 77 69 73
+	   65 20 44 65 73
+	   74 69 6E 61 74
+	   69 6F 6E 20 69
+	   73 20 50 6F 6C
+	   65 20 32 0D 0A
+	   00
+ 0000006D 4D 6F 76 65 20	message2 db "Move from ? to ? ",13,10,0
+	   66 72 6F 6D 20
+	   3F 20 74 6F 20
+	   3F 20 0D 0A 00
+ 00000081 44 6F 6E 65 2E	done db "Done.",13,10,0 
+	   0D 0A 00
+ 00000089 00000001		moves dd 1
+ 0000008D 00000001		acc dd 1
+ 00000091 00000003		that dd 3
+				; ----------------------------------------------------------------------------
+
+
+
+
+ 00000000			.code
+
+				; ----------------------------------------------------------------------------
+ 00000000			procStrLength PROC USES edi,
+					ptrString:PTR BYTE	; pointer to string
+				;
+				; walk the null terminated string at ptrString
+				; incrementing eax. The value in eax is the string length 
+				;
+				; parameters: ptrString - a string pointer
+				; returns: EAX = length of string prtString
+				; ----------------------------------------------------------------------------
+ 00000004  8B 7D 08			mov edi,ptrString
+ 00000007  B8 00000000			mov eax,0     	            ; character count
+ 0000000C			L1:                             ; loop
+ 0000000C  80 3F 00			cmp byte ptr [edi],0	     ; found the null end of string?
+ 0000000F  74 04			je  L2	                     ; yes: jump to L2 and return
+ 00000011  47				inc edi	                     ; no: increment to next byte
+ 00000012  40				inc eax	                     ; increment counter
+ 00000013  EB F7			jmp L1                       ; next iteration of loop
+ 00000015			L2: ret                         ; jump here to return
+ 0000001A			procStrLength ENDP
+				; ----------------------------------------------------------------------------
+
+
+
+
+				; ----------------------------------------------------------------------------
+ 0000001A			procWriteString proc
+				;
+				; Writes a null-terminated string pointed to by EDX to standard
+				; output using windows calls.
+				; ----------------------------------------------------------------------------
+ 0000001A  60				pushad
+
+					INVOKE procStrLength,edx   	   ; return length of string in EAX
+ 00000021  FC				cld                            ; clear the direction flag
+					                               ; must do this before WriteConsole
+
+					INVOKE WriteConsole,
+					    consoleOutHandle,     	   ; console output handle
+					    edx,	                   ; points to string
+					    eax,	                   ; string length
+					    offset bytesWritten,  	   ; returns number of bytes written
+					    0
+
+
+ 00000036  61				popad
+ 00000037  C3				ret
+ 00000038			procWriteString endp
+				; ----------------------------------------------------------------------------
+
+
+
+
+				; ----------------------------------------------------------------------------
+ 00000038			main PROC
+				;
+				; Main procedure. Just initializes stdout, dumps the string, and exits.
+				; ----------------------------------------------------------------------------
+					INVOKE GetStdHandle, STD_OUTPUT_HANDLE ; use Win32 to put 
+					                                        ; stdout handle in EAX
+					                                        
+ 0000003F  A3 00000000 R		mov [consoleOutHandle],eax             ; Put the address of the handle in 
+					                                        ; our variable
+
+ 00000044  BA 00000008 R		mov edx,offset message                 ; load the address of the message 
+					                                        ; into edx for procWriteString
+					
+					INVOKE procWriteString                 ; invoke our write string method. 
+
+														   ;This declares how many disks we have
+ 0000004E  C1 25 00000089 R		shl moves, 3						   ;48 seconds for 31 disks without output
+	   03
+ 00000055			calc:
+ 00000055  BA 00000000			mov edx, 0
+ 0000005A  A1 0000008D R		mov eax, acc				;Start calculating where disk is coming from
+ 0000005F  48				dec eax
+ 00000060  23 05 0000008D R		and eax, acc
+ 00000066  B9 00000003			mov ecx, 3
+ 0000006B  F7 F1			div ecx
+ 0000006D  80 C2 30			add dl, 30h					;Converts number into ascii equivalent
+ 00000070  88 15 00000077 R		mov [message2+10], dl		;Puts the number into our string
+ 00000076  BA 00000000			mov edx, 0
+ 0000007B  A1 0000008D R		mov eax, acc				;Starting calculating where to place disk
+ 00000080  48				dec eax
+ 00000081  0B 05 0000008D R		or eax, acc
+ 00000087  83 C0 01			add eax, 1
+ 0000008A  B9 00000003			mov ecx, 3
+ 0000008F  F7 F1			div ecx
+ 00000091  80 C2 30			add dl, 30h	                                        
+ 00000094  88 15 0000007C R		mov [message2+15], dl
+ 0000009A  BA 0000006D R		mov edx,offset message2
+					INVOKE procWriteString
+ 000000A4  FF 05 0000008D R		inc acc
+ 000000AA  8B 0D 0000008D R		mov ecx, acc
+ 000000B0  3B 0D 00000089 R		cmp ecx, moves
+ 000000B6  75 9D			jne calc 
+ 000000B8  BA 00000081 R		mov edx,offset done
+					INVOKE procWriteString
+					INVOKE ExitProcess,0                   ; Windows method to quit
+
+ 000000C9			main ENDP
+				; ----------------------------------------------------------------------------
+
+				END main
+Microsoft (R) Macro Assembler Version 12.00.21005.1	    02/25/16 14:19:40
+/Hello World in Win32 ASM       (helloworld.asm		     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+FLAT . . . . . . . . . . . . . .	GROUP
+STACK  . . . . . . . . . . . . .	32 Bit	 00001000 DWord	  Stack	  'STACK'	 
+_DATA  . . . . . . . . . . . . .	32 Bit	 00000095 DWord	  Public  'DATA'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 000000C9 DWord	  Public  'CODE'	
+
+
+Procedures, parameters, and locals:
+
+                N a m e                 Type     Value    Attr
+
+ExitProcess  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
+GetStdHandle . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
+WriteConsoleA  . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
+main . . . . . . . . . . . . . .	P Near	 00000038 _TEXT	Length= 00000091 Public STDCALL
+  calc . . . . . . . . . . . . .	L Near	 00000055 _TEXT	
+procStrLength  . . . . . . . . .	P Near	 00000000 _TEXT	Length= 0000001A Public STDCALL
+  ptrString  . . . . . . . . . .	DWord	 bp + 00000008
+  L1 . . . . . . . . . . . . . .	L Near	 0000000C _TEXT	
+  L2 . . . . . . . . . . . . . .	L Near	 00000015 _TEXT	
+procWriteString  . . . . . . . .	P Near	 0000001A _TEXT	Length= 0000001E Public STDCALL
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+@CodeSize  . . . . . . . . . . .	Number	 00000000h   
+@DataSize  . . . . . . . . . . .	Number	 00000000h   
+@Interface . . . . . . . . . . .	Number	 00000003h   
+@Model . . . . . . . . . . . . .	Number	 00000007h   
+@code  . . . . . . . . . . . . .	Text   	 _TEXT
+@data  . . . . . . . . . . . . .	Text   	 FLAT
+@fardata?  . . . . . . . . . . .	Text   	 FLAT
+@fardata . . . . . . . . . . . .	Text   	 FLAT
+@stack . . . . . . . . . . . . .	Text   	 FLAT
+STD_OUTPUT_HANDLE  . . . . . . .	Number	 -0000000Bh   
+WriteConsole . . . . . . . . . .	Text   	 WriteConsoleA
+acc  . . . . . . . . . . . . . .	DWord	 0000008D _DATA	
+bytesWritten . . . . . . . . . .	DWord	 00000004 _DATA	
+consoleOutHandle . . . . . . . .	DWord	 00000000 _DATA	
+done . . . . . . . . . . . . . .	Byte	 00000081 _DATA	
+message2 . . . . . . . . . . . .	Byte	 0000006D _DATA	
+message  . . . . . . . . . . . .	Byte	 00000008 _DATA	
+moves  . . . . . . . . . . . . .	DWord	 00000089 _DATA	
+that . . . . . . . . . . . . . .	DWord	 00000091 _DATA	
+
+	   0 Warnings
+	   0 Errors
